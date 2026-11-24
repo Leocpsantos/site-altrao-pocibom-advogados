@@ -2,6 +2,8 @@
 
 Institutional website for **Altrão & Pocibom Advogados Associados**, a law firm based in Lucélia/SP, Brazil, that serves clients across the country.
 
+**Live:** https://altraoepocibomadv.com.br
+
 Built by [Leonardo Santos](https://www.linkedin.com/in/leonardo-santos-048394281) with Claude Code. Published with the firm's authorization.
 
 ![Desktop](docs/screenshot-desktop.jpg)
@@ -29,7 +31,7 @@ A fast, single-page site with no backend, in Portuguese, that:
 - Practice-area cards that open detail modals, plus an animated FAQ accordion
 - Scroll-reveal animations, counters, parallax, 3D tilt on the emblem and lawyer cards, gold particle background
 - Accessibility: skip link, semantic sections, ARIA on menus and modals
-- SEO: meta tags and Schema.org `LegalService` data
+- SEO: meta tags, canonical URL, Open Graph, Schema.org `LegalService` data, `robots.txt` and `sitemap.xml`
 - Embedded Google Maps location
 
 ## Stack
@@ -52,6 +54,8 @@ Then open http://localhost:8000. Opening `index.html` directly in the browser al
 
 ```
 index.html
+robots.txt
+sitemap.xml
 assets/
   css/style.css
   js/main.js
@@ -65,12 +69,12 @@ I also designed the launch post for the firm's Instagram, using the same visual 
 
 <img src="docs/social-post.jpg" alt="Social media post" width="360">
 
-## Status
+## Deployment
 
-Ready for launch; deployment to production is pending.
+Live since November 24, 2026 at [altraoepocibomadv.com.br](https://altraoepocibomadv.com.br) (the `www` address works too). It is hosted on Cloudflare Pages with the firm's own `.com.br` domain and HTTPS. The `docs/` folder is not part of the deployed site.
 
 ---
 
-🇧🇷 **Em português:** site institucional do escritório Altrão & Pocibom Advogados Associados, de Lucélia/SP. É uma página única, responsiva, feita em HTML, CSS e JavaScript com Claude Code. O formulário de contato envia a mensagem direto para o WhatsApp do advogado escolhido. Publicado com autorização do escritório.
+🇧🇷 **Em português:** site institucional do escritório Altrão & Pocibom Advogados Associados, de Lucélia/SP. É uma página única, responsiva, feita em HTML, CSS e JavaScript com Claude Code. O formulário de contato envia a mensagem direto para o WhatsApp do advogado escolhido. No ar em https://altraoepocibomadv.com.br, publicado com autorização do escritório.
 
 © Altrão & Pocibom Advogados Associados. Names, logos and photos belong to the firm.
