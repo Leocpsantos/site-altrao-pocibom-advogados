@@ -70,12 +70,17 @@
     progress = Math.min(progress + Math.random() * 18, 90);
     if (bar) bar.style.width = progress + '%';
   }, 120);
+  const BG = { sync: () => {} }; // preenchido pelo campo 3D de partículas
+  let startTiltHook = () => {}; // preenchido pelo bloco do tilt do emblema
   const finishLoad = () => {
     clearInterval(tick);
     if (bar) bar.style.width = '100%';
     setTimeout(() => {
       document.body.classList.remove('is-loading');
       document.body.classList.add('loaded');
+      remeasure(); // a barra de rolagem pode surgir quando o preloader sai
+      BG.sync();
+      startTiltHook();
     }, reduceMotion ? 0 : 450);
   };
   if (document.readyState === 'complete') finishLoad();
@@ -154,52 +159,90 @@
   const timeline = $('.timeline');
   const fill = $('.timeline__fill');
   const steps = $$('.step');
+  const waFloat = $('.wa-float');
   let lastY = window.scrollY;
   let ticking = false;
 
-  const onScroll = () => {
-    const y = window.scrollY;
-    const h = document.documentElement.scrollHeight - window.innerHeight;
-    progressBar.style.transform = `scaleX(${h > 0 ? y / h : 0})`;
+  // posição absoluta (topo da página) sem considerar transforms
+  const pageTop = (el) => {
+    let t = 0;
+    for (let n = el; n; n = n.offsetParent) t += n.offsetTop;
+    return t;
+  };
+  // cache de medidas: lido só em resize/load/fonts, nunca dentro do scroll
+  let maxScroll = 0, tlTop = 0, tlH = 1, stepTops = [], pxData = [], pxxData = [];
+  const measure = () => {
+    maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+    if (timeline) {
+      tlTop = pageTop(timeline); tlH = timeline.offsetHeight || 1;
+      stepTops = steps.map(pageTop);
+    }
+    pxData = parallaxEls.map((el) => ({ el, center: pageTop(el) + el.offsetHeight / 2, speed: +el.dataset.speed, last: null }));
+    pxxData = parallaxX.map((el) => ({ el, top: pageTop(el.parentElement), speed: +el.dataset.speed, last: null }));
+  };
+  // estado anterior: só escreve no DOM quando o valor muda
+  const st = { prog: null, scrolled: null, shown: null, hidden: null, fill: null, steps: [] };
 
-    header.classList.toggle('is-scrolled', y > 40);
-    const wa = $('.wa-float');
-    const shown = y > window.innerHeight * 0.6;
-    wa.classList.toggle('is-shown', shown);
-    if (!shown) wa.classList.remove('is-open');
+  const onScroll = (fromScroll = true) => {
+    ticking = false;
+    // --- leituras (tudo vem do cache; scrollY é a única leitura) ---
+    const y = window.scrollY;
+    const vh = window.innerHeight;
+    const prog = maxScroll > 0 ? Math.min(Math.max(y / maxScroll, 0), 1) : 0;
+    const scrolled = y > 40;
+    const shown = y > vh * 0.6;
     const menuOpen = document.body.classList.contains('menu-open');
-    header.classList.toggle('is-hidden', !menuOpen && y > 500 && y > lastY + 4);
-    if (y < lastY - 4) header.classList.remove('is-hidden');
-    lastY = y;
+    const hidden = !menuOpen && y > 500 && y > lastY + 4;
+    if (fromScroll) lastY = y;
+    const mid = vh * 0.6;
+    const tl = timeline ? Math.min(Math.max((mid - (tlTop - y)) / tlH, 0), 1) : 0;
+
+    // --- escritas ---
+    if (prog !== st.prog) { progressBar.style.transform = `scaleX(${prog})`; st.prog = prog; }
+    if (scrolled !== st.scrolled) { header.classList.toggle('is-scrolled', scrolled); st.scrolled = scrolled; }
+    if (shown !== st.shown) {
+      waFloat.classList.toggle('is-shown', shown);
+      if (!shown) waFloat.classList.remove('is-open');
+      st.shown = shown;
+    }
+    // só mexe no header em eventos de scroll (recálculo não deve fazê-lo piscar)
+    if (fromScroll && (hidden !== st.hidden || header.classList.contains('is-hidden') !== hidden)) {
+      header.classList.toggle('is-hidden', hidden); st.hidden = hidden;
+    }
 
     if (!reduceMotion) {
-      parallaxEls.forEach((el) => {
-        const r = el.getBoundingClientRect();
-        const center = r.top + r.height / 2 - window.innerHeight / 2;
-        el.style.transform = `translate3d(0, ${center * +el.dataset.speed}px, 0)`;
-      });
-      parallaxX.forEach((el) => {
-        const r = el.parentElement.getBoundingClientRect();
-        el.style.transform = `translate3d(${(r.top - window.innerHeight) * +el.dataset.speed}px, 0, 0)`;
-      });
+      for (const d of pxData) {
+        const v = Math.round((d.center - y - vh / 2) * d.speed * 100) / 100;
+        if (v !== d.last) { d.el.style.transform = `translate3d(0, ${v}px, 0)`; d.last = v; }
+      }
+      for (const d of pxxData) {
+        const v = Math.round((d.top - y - vh) * d.speed * 100) / 100;
+        if (v !== d.last) { d.el.style.transform = `translate3d(${v}px, 0, 0)`; d.last = v; }
+      }
     }
 
     if (timeline) {
-      const r = timeline.getBoundingClientRect();
-      const mid = window.innerHeight * 0.6;
-      const p = Math.min(Math.max((mid - r.top) / r.height, 0), 1);
-      fill.style.transform = `scaleY(${p})`;
-      steps.forEach((s) => {
-        const sr = s.getBoundingClientRect();
-        s.classList.toggle('is-active', sr.top < mid);
+      if (tl !== st.fill) { fill.style.transform = `scaleY(${tl})`; st.fill = tl; }
+      steps.forEach((el, i) => {
+        const on = stepTops[i] - y < mid;
+        if (on !== st.steps[i]) { el.classList.toggle('is-active', on); st.steps[i] = on; }
       });
     }
-    ticking = false;
   };
   window.addEventListener('scroll', () => {
-    if (!ticking) { requestAnimationFrame(onScroll); ticking = true; }
+    if (!ticking) { requestAnimationFrame(() => onScroll(true)); ticking = true; }
   }, { passive: true });
+
+  // recalcula o cache em resize/load (com debounce) e após carregar as fontes
+  let mT;
+  const remeasure = () => { clearTimeout(mT); mT = setTimeout(() => { measure(); onScroll(false); }, 150); };
+  measure();
   onScroll();
+  window.addEventListener('resize', remeasure);
+  // pega mudanças de altura da página (FAQ, imagens, fontes, barra de rolagem)
+  if ('ResizeObserver' in window) new ResizeObserver(remeasure).observe(document.body);
+  window.addEventListener('load', remeasure);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(remeasure);
 
   /* ---------- Active nav link ---------- */
   const navLinks = $$('.nav__link');
@@ -222,6 +265,7 @@
     burger.setAttribute('aria-label', isOpen ? 'Fechar menu' : 'Abrir menu');
     mobileMenu.setAttribute('aria-hidden', !isOpen);
     if (isOpen) header.classList.remove('is-hidden');
+    BG.sync();
   };
   burger.addEventListener('click', () => toggleMenu());
   $$('a', mobileMenu).forEach((a) => a.addEventListener('click', () => toggleMenu(false)));
@@ -237,13 +281,18 @@
     window.addEventListener('mouseup', () => cursor.classList.remove('is-down'));
     document.addEventListener('mouseleave', () => (cursor.style.opacity = 0));
     document.addEventListener('mouseenter', () => (cursor.style.opacity = 1));
+    // loop só roda enquanto o anel não alcançou o mouse
+    let cursorRaf = 0;
     const loop = () => {
       rx = lerp(rx, mx, 0.18); ry = lerp(ry, my, 0.18);
       dot.style.transform = `translate(${mx}px, ${my}px) translate(-50%, -50%)`;
       ring.style.transform = `translate(${rx}px, ${ry}px) translate(-50%, -50%)`;
-      requestAnimationFrame(loop);
+      if (Math.hypot(mx - rx, my - ry) < 0.1) { cursorRaf = 0; return; }
+      cursorRaf = requestAnimationFrame(loop);
     };
-    loop();
+    const startCursor = () => { if (!cursorRaf) cursorRaf = requestAnimationFrame(loop); };
+    window.addEventListener('mousemove', startCursor, { passive: true });
+    startCursor();
     document.addEventListener('mouseover', (e) => {
       if (e.target.closest('a, button, summary, .area-card, label, input, select, textarea')) cursor.classList.add('is-hover');
     });
@@ -279,16 +328,25 @@
       tx = (e.clientX / innerWidth - 0.5) * 2;
       ty = (e.clientY / innerHeight - 0.5) * 2;
     }, { passive: true });
+    // loop só roda com o hero visível e enquanto o valor ainda converge
+    let tiltRaf = 0, heroVisible = true;
     const loopTilt = () => {
+      // antes do 'loaded' não converge: mantém o loop vivo até o preloader sair
+      if (!document.body.classList.contains('loaded')) { tiltRaf = requestAnimationFrame(loopTilt); return; }
       cx = lerp(cx, tx, 0.06); cy = lerp(cy, ty, 0.06);
-      if (document.body.classList.contains('loaded')) {
+      {
         emblem.style.transform = `rotateY(${cx * 14}deg) rotateX(${-cy * 14}deg)`;
         emblem.style.setProperty('--mx', `${50 + cx * 30}%`);
         emblem.style.setProperty('--my', `${35 + cy * 30}%`);
       }
-      requestAnimationFrame(loopTilt);
+      if (!heroVisible || (Math.abs(cx - tx) < 0.001 && Math.abs(cy - ty) < 0.001)) { tiltRaf = 0; return; }
+      tiltRaf = requestAnimationFrame(loopTilt);
     };
-    loopTilt();
+    const startTilt = () => { if (!tiltRaf && heroVisible) tiltRaf = requestAnimationFrame(loopTilt); };
+    window.addEventListener('mousemove', startTilt, { passive: true });
+    new IntersectionObserver(([e]) => { heroVisible = e.isIntersecting; if (heroVisible) startTilt(); }).observe(tiltWrap);
+    startTiltHook = startTilt;
+    startTilt();
   }
 
   /* ---------- Soft tilt on lawyer cards ---------- */
@@ -313,64 +371,168 @@
     });
   });
 
-  /* ---------- Hero particles (gold dust) ---------- */
-  const canvas = $('.hero__canvas');
-  if (canvas && !reduceMotion) {
+  /* ---------- Campo 3D de partículas douradas (fundo da página inteira) ---------- */
+  const canvas = $('.bg3d');
+  if (canvas) {
     const ctx = canvas.getContext('2d');
-    let w, h, dpr, particles = [];
-    let mouse = { x: -9999, y: -9999 };
-    const resize = () => {
-      dpr = Math.min(window.devicePixelRatio || 1, 2);
-      w = canvas.offsetWidth; h = canvas.offsetHeight;
-      canvas.width = w * dpr; canvas.height = h * dpr;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const count = Math.min(Math.floor((w * h) / 9000), 140);
-      particles = Array.from({ length: count }, () => ({
-        x: Math.random() * w,
-        y: Math.random() * h,
-        r: Math.random() * 1.6 + 0.3,
-        vx: (Math.random() - 0.5) * 0.15,
-        vy: -Math.random() * 0.35 - 0.05,
-        a: Math.random() * 0.6 + 0.2,
-        tw: Math.random() * Math.PI * 2,
-      }));
-    };
-    resize();
-    window.addEventListener('resize', resize);
-    canvas.parentElement.addEventListener('pointermove', (e) => {
-      const r = canvas.getBoundingClientRect();
-      mouse.x = e.clientX - r.left; mouse.y = e.clientY - r.top;
+    const mobile = !finePointer || window.innerWidth < 768;
+    const Z_MIN = 1, Z_MAX = 5, PAR = 0.55, MARGEM = 24, DENS = 9000;
+    const MAX_P = mobile ? 40 : 140;
+    const TAU_SCROLL = mobile ? 0 : 90;   // ms; 0 = sem suavização
+    const TILT_PX = mobile ? 0 : 36, TAU_TILT = 250;
+    const REPEL_R = 110, REPEL_F = 1.4, IDLE_MS = 28, ESCURECER = 0.65;
+    const rand = (a, b) => a + Math.random() * (b - a);
+    const mod = (a, m) => ((a % m) + m) % m;
+
+    // sprites pré-renderizados: miolo sólido do raio r + halo curto (~3 px) e fraco
+    const HALO = 3, NSPR = 8, R0 = 0.3, R1 = 2.2;
+    const sprites = Array.from({ length: NSPR }, (_, i) => {
+      const r = R0 + ((R1 - R0) * i) / (NSPR - 1);
+      const tot = r + HALO, px = Math.ceil(tot * 2 * 2); // 2x para ficar nítido
+      const c = document.createElement('canvas');
+      c.width = c.height = px;
+      const g = c.getContext('2d');
+      const m = px / 2, k = px / (tot * 2);
+      const grad = g.createRadialGradient(m, m, r * k, m, m, tot * k);
+      grad.addColorStop(0, 'rgba(232, 204, 133, 0.25)');
+      grad.addColorStop(1, 'rgba(232, 204, 133, 0)');
+      g.fillStyle = grad;
+      g.fillRect(0, 0, px, px);
+      g.fillStyle = 'rgba(232, 204, 133, 1)';
+      g.beginPath(); g.arc(m, m, r * k, 0, Math.PI * 2); g.fill();
+      return { c, size: tot * 2 };
     });
-    canvas.parentElement.addEventListener('pointerleave', () => { mouse.x = mouse.y = -9999; });
 
-    let visible = true;
-    new IntersectionObserver(([e]) => (visible = e.isIntersecting)).observe(canvas);
+    let w = 0, h = 0, W2 = 0, H2 = 0, dpr = 1, particles = [];
+    let syLisa = window.scrollY, lastSy = syLisa;
+    const cam = { x: 0, y: 0 }, camAlvo = { x: 0, y: 0 };
+    let mx = -9999, my = -9999, lastMouseT = -1e9;
 
-    const draw = () => {
-      if (visible) {
-        ctx.clearRect(0, 0, w, h);
-        for (const p of particles) {
-          const dx = p.x - mouse.x, dy = p.y - mouse.y;
-          const dist = Math.hypot(dx, dy);
-          if (dist < 120) {
-            const f = (120 - dist) / 120;
-            p.x += (dx / dist) * f * 1.6;
-            p.y += (dy / dist) * f * 1.6;
-          }
-          p.x += p.vx; p.y += p.vy; p.tw += 0.02;
-          if (p.y < -10) { p.y = h + 10; p.x = Math.random() * w; }
-          if (p.x < -10) p.x = w + 10; if (p.x > w + 10) p.x = -10;
-          const alpha = p.a * (0.6 + Math.sin(p.tw) * 0.4);
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(232, 204, 133, ${alpha})`;
-          ctx.shadowBlur = 8; ctx.shadowColor = 'rgba(232, 204, 133, .8)';
-          ctx.fill();
-        }
-      }
-      requestAnimationFrame(draw);
+    const novaParticula = () => {
+      const z = rand(Z_MIN, Z_MAX), s = 1 / z;
+      // faixa de s (0,2 a 1) -> sprite, com leve sorteio de ±1
+      let idx = Math.round(((s - 1 / Z_MAX) / (1 - 1 / Z_MAX)) * (NSPR - 1)) + Math.floor(Math.random() * 3) - 1;
+      idx = Math.min(NSPR - 1, Math.max(0, idx));
+      return {
+        s, spr: sprites[idx],
+        x: Math.random() * W2, y: Math.random() * H2,
+        vx: rand(-0.08, 0.08) * s, vy: -(0.05 + Math.random() * 0.3) * s,
+        a: 0.2 + Math.random() * 0.6, tw: Math.random() * Math.PI * 2,
+        ox: 0, oy: 0, // deslocamento temporário da repulsão do mouse
+      };
     };
-    draw();
+    const ajustaQuantidade = () => {
+      const n = Math.min(Math.floor((w * h) / DENS), MAX_P);
+      while (particles.length < n) particles.push(novaParticula());
+      if (particles.length > n) particles.length = n;
+    };
+    const dimensiona = () => {
+      dpr = mobile ? 1 : Math.min(window.devicePixelRatio || 1, 1.5);
+      canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+
+    // desenha um quadro; o brilho cai ao sair do hero (ESCURECER) para não competir com os textos
+    const desenha = () => {
+      const sy = window.scrollY;
+      const dim = 1 - (1 - ESCURECER) * Math.min(Math.max((sy - 0.8 * h) / (0.4 * h), 0), 1);
+      const mouseOn = mx > -1000;
+      ctx.clearRect(0, 0, w, h);
+      for (const p of particles) {
+        const s = p.s;
+        const bx = mod(p.x + cam.x * TILT_PX * s, W2) - MARGEM;
+        const by = mod(p.y - syLisa * PAR * s + cam.y * TILT_PX * 0.5 * s, H2) - MARGEM;
+        if (mouseOn && s > 0.45) {
+          const dx = bx - mx, dy = by - my, d = Math.hypot(dx, dy);
+          if (d < REPEL_R && d > 0.01) {
+            const f = (1 - d / REPEL_R) * REPEL_F;
+            p.ox += (dx / d) * f; p.oy += (dy / d) * f;
+          }
+        }
+        ctx.globalAlpha = p.a * (0.25 + 0.75 * s) * (0.6 + 0.4 * Math.sin(p.tw)) * dim;
+        ctx.drawImage(p.spr.c, bx + p.ox - p.spr.size / 2, by + p.oy - p.spr.size / 2, p.spr.size, p.spr.size);
+      }
+      ctx.globalAlpha = 1;
+    };
+
+    // ---- laço de animação ----
+    let raf = 0, lastT = 0;
+    const frame = (t) => {
+      raf = requestAnimationFrame(frame);
+      if (!lastT) { lastT = t; return; } // 1º frame após retomar: sem salto
+      const dt = t - lastT;
+      const sy = window.scrollY;
+      const recente = t - lastMouseT < 1200;
+      const ativo = sy !== lastSy || Math.abs(sy - syLisa) > 0.5 ||
+        Math.abs(camAlvo.x - cam.x) > 0.002 || Math.abs(camAlvo.y - cam.y) > 0.002 || recente;
+      if (!ativo && dt < IDLE_MS) return; // em repouso: ~30 fps
+      lastT = t; lastSy = sy;
+      const passo = Math.min(dt, 100), k = passo / 16.67;
+      // suavização do scroll; saltos grandes (âncoras) são encaixados
+      if (TAU_SCROLL) {
+        syLisa += (sy - syLisa) * (1 - Math.exp(-passo / TAU_SCROLL));
+        if (Math.abs(sy - syLisa) > 3 * h) syLisa = sy - Math.sign(sy - syLisa) * h;
+      } else syLisa = sy;
+      if (TILT_PX) {
+        const a = 1 - Math.exp(-passo / TAU_TILT);
+        cam.x += (camAlvo.x - cam.x) * a; cam.y += (camAlvo.y - cam.y) * a;
+      }
+      const relax = Math.pow(0.9, k);
+      for (const p of particles) {
+        p.x = mod(p.x + p.vx * k, W2); p.y = mod(p.y + p.vy * k, H2);
+        p.tw += 0.02 * k;
+        p.ox *= relax; p.oy *= relax;
+      }
+      desenha();
+    };
+
+    // pausa de verdade: aba oculta, preloader, menu ou modal abertos
+    const sync = () => {
+      if (reduceMotion) return;
+      const b = document.body.classList;
+      const run = !document.hidden && b.contains('loaded') && !b.contains('menu-open') && !b.contains('modal-open');
+      if (run && !raf) { lastT = 0; raf = requestAnimationFrame(frame); }
+      else if (!run && raf) { cancelAnimationFrame(raf); raf = 0; }
+    };
+    BG.sync = sync;
+    document.addEventListener('visibilitychange', sync);
+
+    // mouse só no desktop (passive)
+    if (finePointer && !mobile) {
+      window.addEventListener('pointermove', (e) => {
+        mx = e.clientX; my = e.clientY; lastMouseT = performance.now();
+        camAlvo.x = Math.max(-1, Math.min(1, (mx / w - 0.5) * 2));
+        camAlvo.y = Math.max(-1, Math.min(1, (my / h - 0.5) * 2));
+      }, { passive: true });
+      document.addEventListener('mouseleave', () => { mx = my = -9999; camAlvo.x = camAlvo.y = 0; lastMouseT = performance.now(); });
+    }
+
+    // resize com debounce; mudança só de altura (barra do celular) não realoca partículas
+    const resize = () => {
+      const nw = canvas.clientWidth, nh = canvas.clientHeight;
+      if (!nw || !nh) return;
+      if (nw === w && nh === h) return;
+      const larguraMudou = nw !== w;
+      const oldW2 = W2;
+      w = nw; h = nh; W2 = w + 2 * MARGEM; H2 = h + 2 * MARGEM;
+      dimensiona();
+      if (larguraMudou && oldW2) for (const p of particles) p.x = (p.x / oldW2) * W2;
+      ajustaQuantidade();
+      if (reduceMotion) desenha(); // estático: redesenha no resize
+    };
+    let rT;
+    window.addEventListener('resize', () => { clearTimeout(rT); rT = setTimeout(resize, 150); });
+    resize();
+    if (reduceMotion) desenha();
+    else sync();
+  }
+
+  /* ---------- Pausa animações CSS infinitas fora da tela ---------- */
+  if (!reduceMotion) {
+    const offIO = new IntersectionObserver((entries) => {
+      entries.forEach((e) => e.target.classList.toggle('is-offscreen', !e.isIntersecting));
+    });
+    $$('.hero, .marquee, .about__badge, .national').forEach((el) => offIO.observe(el));
   }
 
   /* ---------- Accordion smooth animation ---------- */
@@ -445,12 +607,14 @@
     modal.classList.add('is-open');
     modal.setAttribute('aria-hidden', 'false');
     document.body.classList.add('modal-open');
+    BG.sync();
     setTimeout(() => $('.modal__close', modal).focus(), 50);
   };
   const closeModal = () => {
     modal.classList.remove('is-open');
     modal.setAttribute('aria-hidden', 'true');
     document.body.classList.remove('modal-open');
+    BG.sync();
     lastFocus && lastFocus.focus({ preventScroll: true });
   };
   $$('.area-card').forEach((c) => {
@@ -464,6 +628,8 @@
     $('#f-area').selectedIndex = parseInt($('#modal-num').textContent, 10);
     closeModal();
   });
+  const waWrap = $('.wa-float');
+  const waBtn = $('.wa-float__btn');
   // mantém o foco do teclado dentro do modal / menu móvel enquanto abertos
   const trapFocus = (container, e) => {
     const items = $$('a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])', container)
@@ -489,8 +655,6 @@
   });
 
   /* ---------- WhatsApp float ---------- */
-  const waWrap = $('.wa-float');
-  const waBtn = $('.wa-float__btn');
   waBtn.addEventListener('click', () => {
     const open = waWrap.classList.toggle('is-open');
     waBtn.setAttribute('aria-expanded', open);
