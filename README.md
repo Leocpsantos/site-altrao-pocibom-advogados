@@ -4,7 +4,7 @@ Institutional website for **Altrão & Pocibom Advogados Associados**, a law firm
 
 **Live:** https://altraoepocibomadv.com.br
 
-Built by [Leonardo Santos](https://www.linkedin.com/in/leonardo-santos-048394281) with Claude Code. Published with the firm's authorization.
+Built by [Leonardo Santos](https://www.linkedin.com/in/leonardo-santos-ia) with Claude Code. Published with the firm's authorization.
 
 ![Desktop](docs/screenshot-desktop.jpg)
 
