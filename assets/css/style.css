@@ -502,6 +502,11 @@ body.loaded .preloader { clip-path: inset(0 0 100% 0); visibility: hidden; }
 .footer__bottom { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding-top: 28px; padding-bottom: 28px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
 .footer__bottom p { margin: 0; }
 .footer__legal { font-size: 12px; opacity: .7; }
+/* crédito de desenvolvimento: linha própria, discreta, com a etiqueta laranja da marca Atalho IA */
+.footer__credit { flex-basis: 100%; font-size: 12px; color: var(--muted); }
+.footer__credit a { display: inline-flex; align-items: center; gap: 5px; margin-left: 4px; font-family: "Space Grotesk", var(--sans); font-weight: 700; letter-spacing: -.02em; color: var(--text); transition: color .3s; }
+.footer__credit a:hover { color: #ff6a2b; }
+.footer__credit-tag { padding: 1px 5px 0; border-radius: 4px; background: #ff6a2b; color: #0f1b2d; font-size: 10px; line-height: 1.5; letter-spacing: 0; }
 .to-top { flex: none; width: 48px; height: 48px; border-radius: 50%; border: 1px solid var(--line-strong); display: grid; place-items: center; color: var(--gold); font-size: 18px; transition: background .4s, color .4s; }
 .to-top:hover { background: var(--gold); color: #000; }
 
