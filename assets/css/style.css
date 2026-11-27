@@ -244,9 +244,11 @@ body.loaded .preloader { clip-path: inset(0 0 100% 0); visibility: hidden; }
 @keyframes scrollDot { 0% { transform: translateY(0); opacity: 1; } 70% { transform: translateY(12px); opacity: 0; } 100% { opacity: 0; } }
 
 /* ---------- Marquee ---------- */
-.marquee { position: relative; border-block: 1px solid var(--line); background: rgba(18, 16, 13, .78); overflow: hidden; padding: 26px 0;
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 120px, #000 calc(100% - 120px), transparent);
-  mask-image: linear-gradient(90deg, transparent, #000 120px, #000 calc(100% - 120px), transparent); }
+.marquee { position: relative; border-block: 1px solid var(--line); background: rgba(18, 16, 13, .78); overflow: hidden; padding: 26px 0; }
+/* fade das bordas só no desktop: máscara em elemento animado é cara no celular */
+@media (min-width: 768px) and (hover: hover) {
+  .marquee { -webkit-mask-image: linear-gradient(90deg, transparent, #000 120px, #000 calc(100% - 120px), transparent); mask-image: linear-gradient(90deg, transparent, #000 120px, #000 calc(100% - 120px), transparent); }
+}
 .marquee__track { display: flex; align-items: center; gap: 48px; width: max-content; animation: marquee 38s linear infinite; }
 .marquee__track span { font-family: var(--serif); font-size: clamp(26px, 3vw, 40px); font-style: italic; color: var(--text); white-space: nowrap; opacity: .85; }
 .marquee__track b { color: var(--gold); font-size: 16px; font-weight: 400; }

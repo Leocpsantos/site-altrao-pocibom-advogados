@@ -16,7 +16,7 @@ The firm needed a single place where potential clients could understand its prac
 
 A fast, single-page site with no backend, in Portuguese, that:
 
-- presents the firm, its six practice areas, its working method and the two partners;
+- presents the firm, its seven practice areas (including healthcare law for medical and dental clinics), its working method and the two partners;
 - answers frequent questions (first consultation, service outside Lucélia, documents, case follow-up, fees);
 - sends every contact straight to the chosen lawyer's WhatsApp, which is how local clients prefer to talk;
 - follows the advertising rules for Brazilian lawyers (OAB Provision 205/2021): informative content only, no promises of results.
@@ -29,10 +29,12 @@ A fast, single-page site with no backend, in Portuguese, that:
 - Contact form that builds the message and opens WhatsApp with the selected lawyer, with a phone input mask
 - Floating WhatsApp menu with both lawyers
 - Practice-area cards that open detail modals, plus an animated FAQ accordion
-- Scroll-reveal animations, counters, parallax, 3D tilt on the emblem and lawyer cards, gold particle background
+- Full-page 3D gold particle background on a single fixed canvas: depth-based parallax on scroll, camera tilt and mouse repulsion on desktop, lighter mode on phones
+- Scroll-reveal animations, counters, parallax and 3D tilt on the emblem and lawyer cards
 - Accessibility: skip link, semantic sections, ARIA on menus and modals
 - SEO: meta tags, canonical URL, Open Graph, Schema.org `LegalService` data, `robots.txt` and `sitemap.xml`
 - Embedded Google Maps location
+- Performance work: cached layout reads on scroll, animation loops that sleep when idle, offscreen animations paused, no expensive canvas shadows or heavy backdrop blur on phones. Measured with a headless Edge + DevTools Protocol benchmark (scroll frame times and idle CPU, old vs new)
 
 ## Stack
 

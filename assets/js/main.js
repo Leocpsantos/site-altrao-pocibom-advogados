@@ -375,11 +375,9 @@
   const canvas = $('.bg3d');
   if (canvas) {
     const ctx = canvas.getContext('2d');
-    const mobile = !finePointer || window.innerWidth < 768;
+    let mobile = true, MAX_P = 40, TAU_SCROLL = 0, TILT_PX = 0; // reavaliados em aplicaModo()
     const Z_MIN = 1, Z_MAX = 5, PAR = 0.55, MARGEM = 24, DENS = 9000;
-    const MAX_P = mobile ? 40 : 140;
-    const TAU_SCROLL = mobile ? 0 : 90;   // ms; 0 = sem suavização
-    const TILT_PX = mobile ? 0 : 36, TAU_TILT = 250;
+    const TAU_TILT = 250;
     const REPEL_R = 110, REPEL_F = 1.4, IDLE_MS = 28, ESCURECER = 0.65;
     const rand = (a, b) => a + Math.random() * (b - a);
     const mod = (a, m) => ((a % m) + m) % m;
@@ -404,6 +402,15 @@
     });
 
     let w = 0, h = 0, W2 = 0, H2 = 0, dpr = 1, particles = [];
+    // mobile/desktop pela largura; TAU_SCROLL 0 = sem suavização
+    const aplicaModo = () => {
+      mobile = !finePointer || window.innerWidth < 768;
+      MAX_P = mobile ? 40 : 140;
+      TAU_SCROLL = mobile ? 0 : 90;
+      TILT_PX = mobile ? 0 : 36;
+      if (mobile) { cam.x = cam.y = camAlvo.x = camAlvo.y = 0; mx = my = -9999; }
+    };
+    const calcDpr = () => (mobile ? 1 : Math.min(window.devicePixelRatio || 1, 1.5));
     let syLisa = window.scrollY, lastSy = syLisa;
     const cam = { x: 0, y: 0 }, camAlvo = { x: 0, y: 0 };
     let mx = -9999, my = -9999, lastMouseT = -1e9;
@@ -427,15 +434,16 @@
       if (particles.length > n) particles.length = n;
     };
     const dimensiona = () => {
-      dpr = mobile ? 1 : Math.min(window.devicePixelRatio || 1, 1.5);
+      dpr = calcDpr();
       canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
 
     // desenha um quadro; o brilho cai ao sair do hero (ESCURECER) para não competir com os textos
-    const desenha = () => {
+    const desenha = (k, estatico) => {
       const sy = window.scrollY;
-      const dim = 1 - (1 - ESCURECER) * Math.min(Math.max((sy - 0.8 * h) / (0.4 * h), 0), 1);
+      // estático (reduced-motion): canvas fica atrás de todo o conteúdo, usa o brilho já reduzido
+      const dim = estatico ? ESCURECER : 1 - (1 - ESCURECER) * Math.min(Math.max((sy - 0.8 * h) / (0.4 * h), 0), 1);
       const mouseOn = mx > -1000;
       ctx.clearRect(0, 0, w, h);
       for (const p of particles) {
@@ -446,10 +454,12 @@
           const dx = bx - mx, dy = by - my, d = Math.hypot(dx, dy);
           if (d < REPEL_R && d > 0.01) {
             const f = (1 - d / REPEL_R) * REPEL_F;
-            p.ox += (dx / d) * f; p.oy += (dy / d) * f;
+            p.ox += (dx / d) * f * k; p.oy += (dy / d) * f * k; // k: independe da taxa de quadros
           }
         }
-        ctx.globalAlpha = p.a * (0.25 + 0.75 * s) * (0.6 + 0.4 * Math.sin(p.tw)) * dim;
+        let al = p.a * (0.25 + 0.75 * s) * (0.6 + 0.4 * Math.sin(p.tw)) * dim;
+        if (dim > ESCURECER && al > 0.6) al = 0.6; // no hero: não atrapalha a leitura do texto
+        ctx.globalAlpha = al;
         ctx.drawImage(p.spr.c, bx + p.ox - p.spr.size / 2, by + p.oy - p.spr.size / 2, p.spr.size, p.spr.size);
       }
       ctx.globalAlpha = 1;
@@ -471,7 +481,7 @@
       // suavização do scroll; saltos grandes (âncoras) são encaixados
       if (TAU_SCROLL) {
         syLisa += (sy - syLisa) * (1 - Math.exp(-passo / TAU_SCROLL));
-        if (Math.abs(sy - syLisa) > 3 * h) syLisa = sy - Math.sign(sy - syLisa) * h;
+        if (Math.abs(sy - syLisa) > 2 * h) syLisa = sy; // salto instantâneo: encaixa direto
       } else syLisa = sy;
       if (TILT_PX) {
         const a = 1 - Math.exp(-passo / TAU_TILT);
@@ -483,7 +493,7 @@
         p.tw += 0.02 * k;
         p.ox *= relax; p.oy *= relax;
       }
-      desenha();
+      desenha(k);
     };
 
     // pausa de verdade: aba oculta, preloader, menu ou modal abertos
@@ -491,39 +501,47 @@
       if (reduceMotion) return;
       const b = document.body.classList;
       const run = !document.hidden && b.contains('loaded') && !b.contains('menu-open') && !b.contains('modal-open');
-      if (run && !raf) { lastT = 0; raf = requestAnimationFrame(frame); }
+      if (run && !raf) { lastT = 0; syLisa = lastSy = window.scrollY; raf = requestAnimationFrame(frame); }
       else if (!run && raf) { cancelAnimationFrame(raf); raf = 0; }
     };
     BG.sync = sync;
     document.addEventListener('visibilitychange', sync);
 
     // mouse só no desktop (passive)
-    if (finePointer && !mobile) {
+    if (finePointer) {
       window.addEventListener('pointermove', (e) => {
+        if (mobile) return;
         mx = e.clientX; my = e.clientY; lastMouseT = performance.now();
         camAlvo.x = Math.max(-1, Math.min(1, (mx / w - 0.5) * 2));
         camAlvo.y = Math.max(-1, Math.min(1, (my / h - 0.5) * 2));
       }, { passive: true });
-      document.addEventListener('mouseleave', () => { mx = my = -9999; camAlvo.x = camAlvo.y = 0; lastMouseT = performance.now(); });
+      const zeraMouse = () => { mx = my = -9999; camAlvo.x = camAlvo.y = 0; lastMouseT = performance.now(); };
+      document.documentElement.addEventListener('mouseleave', zeraMouse);
+      // iframes (mapa) engolem o mouse: tratar como saída
+      $$('iframe').forEach((f) => f.addEventListener('mouseenter', zeraMouse));
     }
 
     // resize com debounce; mudança só de altura (barra do celular) não realoca partículas
     const resize = () => {
       const nw = canvas.clientWidth, nh = canvas.clientHeight;
       if (!nw || !nh) return;
-      if (nw === w && nh === h) return;
-      const larguraMudou = nw !== w;
-      const oldW2 = W2;
+      aplicaModo();
+      const dprMudou = calcDpr() !== dpr;
+      if (nw === w && nh === h) {
+        if (dprMudou) { dimensiona(); if (reduceMotion) desenha(0, true); } // só o DPR mudou (outro monitor)
+        return;
+      }
+      const oldW2 = W2, oldH2 = H2;
       w = nw; h = nh; W2 = w + 2 * MARGEM; H2 = h + 2 * MARGEM;
       dimensiona();
-      if (larguraMudou && oldW2) for (const p of particles) p.x = (p.x / oldW2) * W2;
+      if (oldW2) for (const p of particles) { p.x = (p.x / oldW2) * W2; p.y = (p.y / oldH2) * H2; }
       ajustaQuantidade();
-      if (reduceMotion) desenha(); // estático: redesenha no resize
+      if (reduceMotion) desenha(0, true); // estático: redesenha no resize
     };
     let rT;
     window.addEventListener('resize', () => { clearTimeout(rT); rT = setTimeout(resize, 150); });
     resize();
-    if (reduceMotion) desenha();
+    if (reduceMotion) desenha(0, true);
     else sync();
   }
 
