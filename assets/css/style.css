@@ -503,10 +503,19 @@ body.loaded .preloader { clip-path: inset(0 0 100% 0); visibility: hidden; }
 .footer__bottom p { margin: 0; }
 .footer__legal { font-size: 12px; opacity: .7; }
 /* crédito de desenvolvimento: linha própria, discreta, com a etiqueta laranja da marca Atalho IA */
-.footer__credit { flex-basis: 100%; font-size: 12px; color: var(--muted); }
-.footer__credit a { display: inline-flex; align-items: center; gap: 5px; margin-left: 4px; font-family: "Space Grotesk", var(--sans); font-weight: 700; letter-spacing: -.02em; color: var(--text); transition: color .3s; }
-.footer__credit a:hover { color: #ff6a2b; }
+.footer__credit { flex-basis: 100%; display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin-top: 6px; font-size: 12px; color: var(--muted); }
+/* selo-link discreto: contorno laranja suave + seta ↗ deixam claro que leva ao site da Atalho IA */
+.footer__credit-link {
+  display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px 5px 8px; border-radius: 999px;
+  border: 1px solid rgba(255, 106, 43, .35); background: rgba(255, 106, 43, .06);
+  font-family: "Space Grotesk", var(--sans); font-weight: 700; font-size: 14px; letter-spacing: -.02em; color: var(--text);
+  transition: border-color .3s, background .3s, color .3s;
+}
+.footer__credit-link:hover, .footer__credit-link:focus-visible { border-color: #ff6a2b; background: rgba(255, 106, 43, .12); color: #fff; }
+.footer__credit-icon { width: 16px; height: 16px; flex: none; }
 .footer__credit-tag { padding: 1px 5px 0; border-radius: 4px; background: #ff6a2b; color: #0f1b2d; font-size: 10px; line-height: 1.5; letter-spacing: 0; }
+.footer__credit-go { width: 13px; height: 13px; flex: none; color: #ff6a2b; stroke-width: 2.2; transition: transform .3s var(--ease); }
+.footer__credit-link:hover .footer__credit-go { transform: translate(2px, -2px); }
 .to-top { flex: none; width: 48px; height: 48px; border-radius: 50%; border: 1px solid var(--line-strong); display: grid; place-items: center; color: var(--gold); font-size: 18px; transition: background .4s, color .4s; }
 .to-top:hover { background: var(--gold); color: #000; }
 
